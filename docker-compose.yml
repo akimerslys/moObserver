@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  chatspuffer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: chatspuffer-image
+    container_name: chatspuffer
+    restart: unless-stopped
+    networks:
+      - mo_net
+
+  postgres:
+    image: postgres:14-alpine
+    container_name: postgres
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
+      - POSTGRES_DB=${DB_NAME}
+      - PGDATA='/var/lib/postgresql/data/pgdata'
+    networks:
+      - mo_net
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+networks:
+  mo_net:
+    driver: bridge

@@ -27,7 +27,7 @@ public class ClientConn {
     private static final ExecutorService executor = Executors.newFixedThreadPool(10);
     private Timestamp lastTopUpdate;
 
-    public ClientConn(int id, String login, String pass, Connection conn) {
+    public ClientConn(String login, String pass, Connection conn) {
         this.login = login;
         this.pass = pass;
         this.conn = conn;
@@ -77,7 +77,7 @@ public class ClientConn {
                     scheduler.scheduleAtFixedRate(this::requestTop, 0, 1, TimeUnit.HOURS);
                     future.complete(null);
                 } else {
-                    future.completeExceptionally(new Exception("Conn Error"));
+                    reconnect();
                 }
             }).on(Socket.EVENT_CONNECT_ERROR, args -> {
                 System.out.println("Connection error: " + args[0]);
@@ -104,13 +104,11 @@ public class ClientConn {
     }
 
     private void scheduleReconnect() {
-        if (true) {
-            System.out.println("Scheduling reconnect in 10 seconds...");
-            scheduler.schedule(() -> {
-                System.out.println("Reconnecting...");
-                reconnect();
-            }, 10, TimeUnit.SECONDS);
-        }
+        System.out.println("Scheduling reconnect in 10 seconds...");
+        scheduler.schedule(() -> {
+            System.out.println("Reconnecting...");
+            reconnect();
+        }, 10, TimeUnit.SECONDS);
     }
 
 
@@ -143,14 +141,14 @@ public class ClientConn {
     private CompletableFuture<Void> waitUntilLogged() {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
-        // Повторяющаяся задача для проверки состояния logged
+        // repeatable logged checker
         scheduler.scheduleAtFixedRate(() -> {
             if (this.logged) {
                 future.complete(null);
             }
         }, 0, 10, TimeUnit.SECONDS);
 
-        // Задача для отмены ожидания через 50 секунд (5 попыток по 10 секунд)
+        // cancel task
         scheduler.schedule(() -> {
             if (!future.isDone()) {
                 future.completeExceptionally(new RuntimeException("Timed out waiting for login"));
@@ -169,11 +167,11 @@ public class ClientConn {
                     Message msg = queue.take();
                     saveMsg(msg);
                 } catch (Exception e) { //Interrupted
-                    Thread.currentThread().interrupt(); // Восстановление флага прерывания
+                    Thread.currentThread().interrupt();
                 }
             }
         });
-        worker.setDaemon(true); // Это позволит прервать поток при завершении основной программы
+        worker.setDaemon(true);
         worker.start();
     }
 
@@ -238,7 +236,15 @@ public class ClientConn {
         Message m;
         try {
             JSONObject msg = (JSONObject) args[0];
-            m = new Message(msg.getString("author"), msg.getInt("MMR"), msg.getInt("countWin"), msg.getInt("countLoose"), msg.getString("message"), msg.getString("clan"), msg.getString("colorNick").substring(2, 7));
+            String color = msg.getString("colorNick");
+            m = new Message(
+                    msg.getString("author"),
+                    msg.getInt("MMR"),
+                    msg.getInt("countWin"),
+                    msg.getInt("countLoose"),
+                    msg.getString("message"),
+                    msg.getString("clan"),
+                    color.substring(color.indexOf("#"), color.indexOf("]")));
         } catch (org.json.JSONException e) {
             return;
         }
@@ -279,7 +285,7 @@ public class ClientConn {
                 int newMmr = playerUpdate.getInt("mmr");
                 updateOrInsertPlayer(user_login, newMmr, 0, 0, "?", "?", false);
             }
-            System.out.println("Updated " + j * 50 + " queries");
+            System.out.println("Updated ~" + j * 50 + " queries");
         }
     }
 

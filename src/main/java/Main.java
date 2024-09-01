@@ -1,13 +1,12 @@
-import java.sql.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.sql.Connection;
 
 
 public class Main {
 
     public static void main(String[] args) {
-        ExecutorService executor = Executors.newFixedThreadPool(10);
         Connection conn = null;
+
+        // function
 
         try {
             // Get the database connection
@@ -19,14 +18,14 @@ public class Main {
             e.printStackTrace();
         }
 
-        start(conn);
+        //start(conn);
 
     }
 
     private static void start(Connection conn) {
         try {
             // Create a new ClientConn instance
-            new ClientConn(1, Secrets.mo_login, Secrets.mo_pass, conn);
+            new ClientConn(Secrets.login, Secrets.pass, conn);
         } catch (Exception e) {
             e.printStackTrace();
         }

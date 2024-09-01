@@ -4,12 +4,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 public class Database {
-    private static final String URL = Secrets.db_url;
-    private static final String USER = Secrets.db_usr;
-    private static final String PASSWORD = Secrets.db_pass;
 
     public static Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(URL, USER, PASSWORD);
+        return DriverManager.getConnection(Secrets.get_db_url(), Secrets.dbUser, Secrets.dbPass);
     }
 
     public static void createTables(Connection conn) {
@@ -23,7 +20,7 @@ public class Database {
                     "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
                     ");";
             statement.executeUpdate(createPlayerMsgTable);
-            System.out.println("PlayerMsg table created successfully.");
+            System.out.println("PlayerMsg table initialized successfully.");
 
             // Create PlayerStats table
             // login, mmr, win, lose, clan, color, last_updated
@@ -38,7 +35,7 @@ public class Database {
                     "last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
                     ");";
             statement.executeUpdate(createPlayerStatsTable);
-            System.out.println("PlayerStats table created successfully.");
+            System.out.println("PlayerStats table initialized successfully.");
 
             // Create PlayerStatsHistory table
             String createPlayerStatsHistoryTable = "CREATE TABLE IF NOT EXISTS PlayerStatsHistory (" +
@@ -49,7 +46,7 @@ public class Database {
                     "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
                     ");";
             statement.executeUpdate(createPlayerStatsHistoryTable);
-            System.out.println("PlayerStatsHistory table created successfully.");
+            System.out.println("PlayerStatsHistory table initialized successfully.");
 
         } catch (SQLException e) {
             e.printStackTrace();
