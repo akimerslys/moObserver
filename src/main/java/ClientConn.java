@@ -4,6 +4,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import java.sql.*;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.concurrent.*;
@@ -23,6 +25,7 @@ public class ClientConn {
     private final BlockingQueue<Message> queue = new LinkedBlockingQueue<>();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private static final ExecutorService executor = Executors.newFixedThreadPool(10);
+    private Timestamp lastTopUpdate;
 
     public ClientConn(int id, String login, String pass, Connection conn) {
         this.login = login;
@@ -253,12 +256,13 @@ public class ClientConn {
     }
 
     private void requestTop() {
-        waitUntilLogged()
-                .thenRun(() -> this.a.socket.emit("Top"))
-                .exceptionally(ex -> {
-                    ex.printStackTrace();
-                    return null;
-                });
+        Timestamp now = new Timestamp(System.currentTimeMillis());
+        Instant pastInstant = lastTopUpdate.toInstant();
+        Instant currentInstant = now.toInstant();
+        Duration duration = Duration.between(pastInstant, currentInstant);
+        if (duration.toHours() >= 1) {
+            this.a.socket.emit("Top");
+        }
     }
 
     public void processPlayerUpdates(JSONArray playerUpdates) {
