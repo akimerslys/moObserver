@@ -1,18 +1,14 @@
-# Variables
-SERVICE_NAME = chatspuffer
-COMPOSE_FILE = docker-compose.yml
-
 # Stop the service
 stop:
-	docker-compose -f $(COMPOSE_FILE) stop $(SERVICE_NAME)
+	docker compose stop $(SERVICE_NAME)
 
 # Remove the service (optional, in case you want to ensure it's fully removed before recreating)
 rm:
-	docker-compose -f $(COMPOSE_FILE) rm -f $(SERVICE_NAME)
+	docker compose rm $(SERVICE_NAME)
 
 # Recreate the service
 up: stop rm
-	docker-compose -f $(COMPOSE_FILE) up -d $(SERVICE_NAME)
+	docker compose up -d $(SERVICE_NAME)
 
 # Combined target to stop, remove, and recreate the service
 update: stop rm up
