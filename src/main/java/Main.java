@@ -6,8 +6,6 @@ public class Main {
     public static void main(String[] args) {
         Connection conn = null;
 
-        // function
-
         try {
             // Get the database connection
             conn = Database.getConnection();
@@ -18,7 +16,7 @@ public class Main {
             e.printStackTrace();
         }
 
-        //start(conn);
+        start(conn);
 
     }
 

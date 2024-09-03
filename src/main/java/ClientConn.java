@@ -21,7 +21,7 @@ public class ClientConn {
     public String sid;
     public String login;
     public String pass;
-    private final Connection conn;
+    private Connection conn;
     private final BlockingQueue<Message> queue = new LinkedBlockingQueue<>();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private static final ExecutorService executor = Executors.newFixedThreadPool(10);
@@ -74,7 +74,7 @@ public class ClientConn {
                     System.out.println("Connected to server. Sid " + a.getSocketId());
                     sid = a.getSocketId();
                     login_user();
-                    scheduler.scheduleAtFixedRate(this::requestTop, 0, 1, TimeUnit.HOURS);
+                    waitUntilLogged();
                     future.complete(null);
                 } else {
                     reconnect();
@@ -144,6 +144,7 @@ public class ClientConn {
         // repeatable logged checker
         scheduler.scheduleAtFixedRate(() -> {
             if (this.logged) {
+                scheduler.scheduleAtFixedRate(this::requestTop, 0, 1, TimeUnit.HOURS);
                 future.complete(null);
             }
         }, 0, 10, TimeUnit.SECONDS);
@@ -244,7 +245,7 @@ public class ClientConn {
                     msg.getInt("countLoose"),
                     msg.getString("message"),
                     msg.getString("clan"),
-                    color.substring(color.indexOf("#"), color.indexOf("]")));
+                    color.substring(color.indexOf("#") + 1, color.indexOf("]")));
         } catch (org.json.JSONException e) {
             return;
         }
@@ -254,6 +255,7 @@ public class ClientConn {
 
     private void handleResultTop(Object... args) {
         System.out.println(args[0]);
+        lastTopUpdate = new Timestamp(System.currentTimeMillis());
         CompletableFuture.runAsync(() -> processPlayerUpdates((JSONArray) args[0]), executor)
                 .exceptionally(ex -> {
                     ex.printStackTrace();
@@ -263,6 +265,10 @@ public class ClientConn {
 
     private void requestTop() {
         Timestamp now = new Timestamp(System.currentTimeMillis());
+        if (lastTopUpdate == null) {
+            this.a.socket.emit("Top");
+            return;
+        }
         Instant pastInstant = lastTopUpdate.toInstant();
         Instant currentInstant = now.toInstant();
         Duration duration = Duration.between(pastInstant, currentInstant);
@@ -322,10 +328,24 @@ public class ClientConn {
             }
         } catch (SQLException e) {
             logger.log(Level.SEVERE, "SQL Error", e);
+            testDb();
         }
         return null;
     }
 
+    private void saveMsgToDb(Message msg) {
+        String sql = "INSERT INTO messages (author, message, created_at) VALUES (?, ?, ?)";
+
+        try {
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, msg.getAuthor());
+            stmt.setString(2, msg.getMessage());
+            stmt.setTimestamp(3, new Timestamp(System.currentTimeMillis()));
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, e.toString());
+        }
+    }
 
     private void updateOrInsertPlayer(String user_login, int mmr, int win, int lose, String clan, String color, boolean full) {
         String sql = "UPDATE PlayerStats SET mmr = ?, win = ?, lose = ?, clan = ?, color = ?, last_updated = ? WHERE login = ?";
@@ -398,8 +418,20 @@ public class ClientConn {
 
     private void saveMsg(Message msg) {
 
+        saveMsgToDb(msg);
+
         updateOrInsertPlayer(msg.getAuthor(), msg.getMmr(), msg.getCountWin(), msg.getCountLoose(), msg.getClan(), msg.getColorNick(), true);
 
+    }
+
+    private void testDb(){
+        if (!Database.testConnection(conn)) {
+            try {
+                this.conn = Database.getConnection();
+            } catch (SQLException e) {
+                logger.warning(e.toString());
+            }
+        }
     }
 
 }

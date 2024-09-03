@@ -1,12 +1,18 @@
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 
 public class Database {
 
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(Secrets.get_db_url(), Secrets.dbUser, Secrets.dbPass);
+    }
+
+    public static boolean testConnection(Connection conn) {
+        try {
+            PreparedStatement stmt = conn.prepareStatement("SELECT 1");
+            return true;
+        } catch (SQLException e) {
+            return false;
+        }
     }
 
     public static void createTables(Connection conn) {
