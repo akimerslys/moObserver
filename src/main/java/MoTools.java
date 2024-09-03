@@ -1,4 +1,30 @@
+import org.json.JSONException;
+import org.json.JSONObject;
+
 public class MoTools {
+
+    public static JSONObject getLogin(String login, String pass, String sid) {
+        JSONObject jSONObject = new JSONObject();
+        try {
+            jSONObject.put("login", login);
+            jSONObject.put("password", pass);
+            jSONObject.put("isUsePassword", true);
+            jSONObject.put("version", "184.0");
+            jSONObject.put("color", false);
+            jSONObject.put("i", sid + " ! null ! null ! http://www.google.com ! unknown ! Java/18.0.1.1 ! unknown");
+            jSONObject.put("steamId", "");
+            jSONObject.put("o", "2068136186");
+            jSONObject.put("p1", ""); // ipv4
+            jSONObject.put("p2", ""); // ipv6
+            jSONObject.put("m1", "");
+            jSONObject.put("m2", "");
+            jSONObject.put("me", false);
+        } catch (JSONException jSONException) {
+            jSONException.printStackTrace();
+        }
+        return jSONObject;
+    }
+
     public static int getRank(int mmr) {
         int lvl;
         if (mmr < 180) {

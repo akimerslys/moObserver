@@ -26,12 +26,14 @@ public class ClientConn {
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private static final ExecutorService executor = Executors.newFixedThreadPool(10);
     private Timestamp lastTopUpdate;
+    private ScheduledFuture<?> reconntask;
+    private int reconTimes;
 
     public ClientConn(String login, String pass, Connection conn) {
         this.login = login;
         this.pass = pass;
         this.conn = conn;
-        l();
+        opensocket();
         messageProcessing();
         connectAndLogin();
     }
@@ -48,20 +50,24 @@ public class ClientConn {
                 .exceptionally(ex -> {
                     System.out.println("Error during connection or login: " + ex.getMessage());
                     ex.printStackTrace();
+                    sendAdmin(ex.toString());
                     return null;
                 });
     }
 
-    public void l() {
+    public void opensocket() {
         try {
             IO.Options options = new IO.Options();
             //options.proxy = proxy;
             options.reconnection = false;
             options.timeout = 30000L;
+            options.reconnectionAttempts = 100;
+            options.reconnectionDelay = 10000;
             this.a = new hj(IO.socket(URI.create("http://mafiaonline.jcloud.kz"), options));
             setupListeners();
         } catch (Exception e) {
             e.printStackTrace();
+            handleError(e);
             System.out.println("Failed to create socket: " + e.getMessage());
         }
     }
@@ -73,20 +79,33 @@ public class ClientConn {
                 if (a.getSocketId() != null) {
                     System.out.println("Connected to server. Sid " + a.getSocketId());
                     sid = a.getSocketId();
+                    reconTimes = 0;
                     login_user();
                     waitUntilLogged();
                     future.complete(null);
                 } else {
-                    reconnect();
+                    scheduleReconnect();
                 }
             }).on(Socket.EVENT_CONNECT_ERROR, args -> {
                 System.out.println("Connection error: " + args[0]);
+                if (Objects.equals(args[0].toString(), "transport error")) {
+                    this.a.closeSocket();
+                    opensocket();
+                    connectAndLogin();
+                    return;
+                }
                 scheduleReconnect();
             }).on(Socket.EVENT_CONNECT_TIMEOUT, args -> {
                 System.out.println("Connection timeout: " + args[0]);
                 scheduleReconnect();
             }).on(Socket.EVENT_DISCONNECT, args -> {
                 System.out.println("Disconnected from server: " + args[0]);
+                if (Objects.equals(args[0].toString(), "transport error")) {
+                    this.a.closeSocket();
+                    opensocket();
+                    connectAndLogin();
+                    return;
+                }
                 scheduleReconnect();
             });
 
@@ -100,41 +119,32 @@ public class ClientConn {
     }
 
     private void reconnect() {
-        this.a.connectSocket();
+        if (!this.a.isConnected() || this.a.getSocketId() == null) {
+            this.reconTimes++;
+            if (this.reconTimes > 10) {
+                sendAdmin("To many connection retries #" + this.reconTimes);
+            }
+            this.a.disconnectSocket();
+            this.a.connectSocket();
+        }
     }
 
     private void scheduleReconnect() {
-        System.out.println("Scheduling reconnect in 10 seconds...");
-        scheduler.schedule(() -> {
-            System.out.println("Reconnecting...");
-            reconnect();
-        }, 10, TimeUnit.SECONDS);
+        if (this.reconntask  == null || this.reconntask.isDone()) {
+            System.out.println("Scheduling reconnect in 10 seconds...");
+            this.reconntask = scheduler.schedule(() -> {
+                System.out.println("Reconnecting...");
+                reconnect();
+            }, 10, TimeUnit.SECONDS);
+        }
     }
 
 
     public void login_user() {
-        JSONObject jSONObject = new JSONObject();
-        System.out.println(this.sid);
-        try {
-            jSONObject.put("login", this.login);
-            jSONObject.put("password", this.pass);
-            jSONObject.put("isUsePassword", true);
-            jSONObject.put("version", "184.0");
-            jSONObject.put("color", false);
-            jSONObject.put("i", this.sid + " ! null ! null ! http://www.google.com ! unknown ! Java/18.0.1.1 ! unknown");
-            jSONObject.put("steamId", "");
-            jSONObject.put("o", "2068136186");
-            jSONObject.put("p1", ""); // ipv4
-            jSONObject.put("p2", ""); // ipv6
-            jSONObject.put("m1", "");
-            jSONObject.put("m2", "");
-            jSONObject.put("me", false);
-        } catch (JSONException jSONException) {
-            jSONException.printStackTrace();
-        }
+        JSONObject jo = MoTools.getLogin(login, pass, sid);
 
         //loginFuture = new CompletableFuture<>();
-        this.a.emitEvent("Login", jSONObject);
+        this.a.emitEvent("Login", jo);
         //return loginFuture;
     }
 
@@ -160,14 +170,16 @@ public class ClientConn {
     }
 
     private void messageProcessing() {
-        System.out.println("started p");
+        logger.info("started message processing");
         Thread worker = new Thread(() -> {
             while (true) {
                 try {
                     int i = 0;
                     Message msg = queue.take();
+                    logger.log(Level.INFO, i + msg.getAuthor() + msg.getCountWin());
                     saveMsg(msg);
                 } catch (Exception e) { //Interrupted
+                    handleError(e);
                     Thread.currentThread().interrupt();
                 }
             }
@@ -180,7 +192,6 @@ public class ClientConn {
     private void setupListeners() {
         this.a.socket.on("LoginNotUniq", this::handleLoginNotUnique);
         this.a.socket.on("ResultLogin", this::handleResultLogin);
-        this.a.socket.on("OfferToReturn", this::handleGameStarted);
         this.a.socket.on("NewMessageRegionChat", this::handleMessage);
         this.a.socket.on("ResultTop", this::handleResultTop);
     }
@@ -200,37 +211,30 @@ public class ClientConn {
 
                     if (jsonObject.has("Status")) {
                         String msg = jsonObject.getString("message");
-                        System.out.println("BadLogin: " + msg);
+                        logger.log(Level.SEVERE, "BadLogin: " + msg);
                         return;
                     }
 
-                    System.out.println("Login: " + jsonObject.getString("login"));
-                    System.out.println("Password: " + jsonObject.getString("password"));
-                    System.out.println("Money: " + jsonObject.getInt("money"));
+                    logger.info("Login: " + jsonObject.getString("login"));
+                    logger.info("Password: " + jsonObject.getString("password"));
+                    logger.info("Money: " + jsonObject.getInt("money"));
 
                     this.logged = true;
                     this.a.socket.emit("EnterRegionChat");
                 }
             } else {
-                System.out.println("Received data is not a JSONArray.");
+                logger.log(Level.SEVERE, "Received data is not a JSONArray.");
             }
         } catch (JSONException e) {
-            System.out.println("JSON Exception: " + e.getMessage());
+            logger.log(Level.SEVERE,"JSON Exception: " + e.getMessage());
             e.printStackTrace();
             this.logged = false;
         }
     }
 
-    private void handleGameStarted(Object... objects) {
-        System.out.println("Game already started");
-        this.a.socket.close();
-    }
-
     private void handleLoginNotUnique(Object... objects) {
-        System.out.println("Login not unique");
-        this.a.disconnectSocket();
-        this.a.connectSocket();
-        this.l();
+        logger.warning("Login not unique");
+        this.a.closeSocket();
     }
 
     private void handleMessage(Object... args) {
@@ -249,35 +253,32 @@ public class ClientConn {
         } catch (org.json.JSONException e) {
             return;
         }
-        logger.info(m.getAuthor() + " : " + m.getMessage());
+        String logmsg = "%s [%d|%d:%d] : %s";
+        logger.info(String.format(logmsg, m.getAuthor(), m.getMmr(), m.getCountWin(), m.getCountLoose(), m.getMessage()));
+
         queue.offer(m);
     }
 
     private void handleResultTop(Object... args) {
-        System.out.println(args[0]);
+        logger.info(args[0].toString());
         lastTopUpdate = new Timestamp(System.currentTimeMillis());
-        CompletableFuture.runAsync(() -> processPlayerUpdates((JSONArray) args[0]), executor)
+        CompletableFuture.runAsync(() -> processRankUpdates((JSONArray) args[0]), executor)
                 .exceptionally(ex -> {
                     ex.printStackTrace();
                     return null;
                 });
     }
-
+    private void emitTop() {
+            this.a.socket.emit("Top");
+        }
     private void requestTop() {
         Timestamp now = new Timestamp(System.currentTimeMillis());
-        if (lastTopUpdate == null) {
-            this.a.socket.emit("Top");
-            return;
-        }
-        Instant pastInstant = lastTopUpdate.toInstant();
-        Instant currentInstant = now.toInstant();
-        Duration duration = Duration.between(pastInstant, currentInstant);
-        if (duration.toHours() >= 1) {
-            this.a.socket.emit("Top");
+        if (lastTopUpdate == null || Duration.between(lastTopUpdate.toInstant(), now.toInstant()).toHours() >= 1 && this.logged) {
+            emitTop();
         }
     }
 
-    public void processPlayerUpdates(JSONArray playerUpdates) {
+    public void processRankUpdates(JSONArray playerUpdates) {
 
         List<JSONArray> chunks = chunkArray(playerUpdates, 50);
 
@@ -291,7 +292,7 @@ public class ClientConn {
                 int newMmr = playerUpdate.getInt("mmr");
                 updateOrInsertPlayer(user_login, newMmr, 0, 0, "?", "?", false);
             }
-            System.out.println("Updated ~" + j * 50 + " queries");
+            logger.info("Updated ~" + j * 50 + " queries");
         }
     }
 
@@ -327,7 +328,7 @@ public class ClientConn {
                 }
             }
         } catch (SQLException e) {
-            logger.log(Level.SEVERE, "SQL Error", e);
+            handleError(e);
             testDb();
         }
         return null;
@@ -343,7 +344,7 @@ public class ClientConn {
             stmt.setTimestamp(3, new Timestamp(System.currentTimeMillis()));
             stmt.executeUpdate();
         } catch (SQLException e) {
-            logger.log(Level.SEVERE, e.toString());
+            handleError(e);
         }
     }
 
@@ -353,7 +354,6 @@ public class ClientConn {
 
         Player p = getPlayer(user_login);
         if (p != null) {
-            win = p.getWin();
             if (full) {
                 toUpdate |= checkAndLogChange(p.getId(), "win", win, p.getWin());
                 toUpdate |= checkAndLogChange(p.getId(), "lose", lose, p.getLose());
@@ -385,7 +385,7 @@ public class ClientConn {
                 stmt.setTimestamp(mmr_index + 5, new Timestamp(System.currentTimeMillis()));
                 stmt.executeUpdate();
             } catch (SQLException e) {
-                logger.log(Level.SEVERE, "SQL Error", e);
+                handleError(e);
             }
         }
 
@@ -404,7 +404,7 @@ public class ClientConn {
             stmt.executeUpdate();
             logger.info("Changed for #" + playerId + " [" + changeType + " : " + newValue + "]");
         } catch (SQLException e) {
-            logger.log(Level.SEVERE, "SQL Error", e);
+            handleError(e);
         }
     }
 
@@ -424,12 +424,21 @@ public class ClientConn {
 
     }
 
+    private void handleError(Exception e) {
+        logger.log(Level.SEVERE, e.toString());
+        sendAdmin(e.toString());
+    }
+
+    private void sendAdmin(String msg) {
+        Telegram.sendMsg(Secrets.adminId, msg);
+    }
+
     private void testDb(){
         if (!Database.testConnection(conn)) {
             try {
                 this.conn = Database.getConnection();
             } catch (SQLException e) {
-                logger.warning(e.toString());
+                handleError(e);
             }
         }
     }

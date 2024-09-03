@@ -21,6 +21,8 @@ public class Message {
     public int getMmr() { return mmr; }
     public int getCountWin() { return countWin; }
     public int getCountLoose() { return countLoose; }
+    public int getWin() { return countWin; }
+    public int getLoose() { return countLoose; }
     public String getMessage() { return message; }
     public String getClan() { return clan; }
     public String getColorNick() { return colorNick; }

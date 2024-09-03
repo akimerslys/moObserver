@@ -122,6 +122,5 @@ buildNumber.properties
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
 
-src/main/java/Secrets.java
 .idea/
 .env
