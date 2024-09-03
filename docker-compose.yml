@@ -1,4 +1,4 @@
-version: '3.8'
+version: '3'
 
 services:
   moOBSclient:
@@ -31,3 +31,6 @@ services:
 networks:
   mo_net:
     driver: bridge
+
+volumes:
+  postgres-data: {}
