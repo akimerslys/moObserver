@@ -5,7 +5,7 @@ FROM openjdk:18-jdk-alpine
 WORKDIR /app
 
 # Copy the .jar file to the working directory in the container
-COPY target/chatSpuffer-1.2-BETA-all.jar /app/chatSpuffer.jar
+COPY target/chatSpuffer-1-all.jar /app/chatSpuffer.jar
 COPY ./.env .
 # Expose port 8080 if your application listens on it (optional)
 # EXPOSE 8080

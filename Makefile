@@ -30,3 +30,11 @@ minstall:
 
 build:
 	mvn clean package
+
+dbuild:
+	docker rm chatspuffer
+	docker rmi chatspuffer
+	docker build -t chatspuffer .
+	docker run --name chatspuffer -d chatspuffer
+
+
