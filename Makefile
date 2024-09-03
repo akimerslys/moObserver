@@ -33,11 +33,10 @@ minstall:
 build:
 	mvn clean package
 
-dbuild:
-	docker rm moOBSclient
-	docker rmi moOBSclient
-	docker build -t moOBSclient .
-	docker run --name moOBSclient -d moOBSclient
+update:
+	docker rm  moobs-moclient
+	docker rmi  moobs-moclient
+	docker compose up -d  moclient
 
 send:
 	echo scp target/moObserver-1-all.jar $(DB_USER)@$(DB_HOST):~/work/moObs/target/
