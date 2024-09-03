@@ -6,7 +6,7 @@
     <version>1</version>
 
     <groupId>com.akimerslys</groupId>
-    <artifactId>chatSpuffer</artifactId>
+    <artifactId>moObserver</artifactId>
     <packaging>jar</packaging>
 
     <dependencies>

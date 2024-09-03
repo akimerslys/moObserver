@@ -1,3 +1,5 @@
+include .env
+
 # Stop the service
 stop:
 	docker compose stop $(SERVICE_NAME)
@@ -23,7 +25,7 @@ help:
 startup: up
 
 start:
-	docker compose up chatspuffer
+	docker compose up moOBSclient
 
 minstall:
 	mvn clean install
@@ -32,9 +34,11 @@ build:
 	mvn clean package
 
 dbuild:
-	docker rm chatspuffer
-	docker rmi chatspuffer
-	docker build -t chatspuffer .
-	docker run --name chatspuffer -d chatspuffer
+	docker rm moOBSclient
+	docker rmi moOBSclient
+	docker build -t moOBSclient .
+	docker run --name moOBSclient -d moOBSclient
 
+send:
+	echo scp target/moObserver-1-all.jar $(DB_USER)@$(DB_HOST):~/work/moObs/target/
 

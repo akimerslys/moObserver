@@ -6,10 +6,10 @@ WORKDIR /app
 
 # Copy the .jar file to the working directory in the container
 
-COPY ./target/chatSpuffer-1-all.jar /app/chatSpuffer.jar
+COPY ./target/moObserver-1-all.jar /app/moObserver.jar
 COPY ./.env .
 # Expose port 8080 if your application listens on it (optional)
 # EXPOSE 8080
 
 # Define the command to run the .jar file
-ENTRYPOINT ["java", "-jar", "/app/chatSpuffer.jar"]
+ENTRYPOINT ["java", "-jar", "/app/moObserver.jar"]
