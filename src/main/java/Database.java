@@ -9,6 +9,7 @@ public class Database {
     public static boolean testConnection(Connection conn) {
         try {
             PreparedStatement stmt = conn.prepareStatement("SELECT 1");
+            stmt.executeUpdate();
             return true;
         } catch (SQLException e) {
             return false;
@@ -53,6 +54,34 @@ public class Database {
                     ");";
             statement.executeUpdate(createPlayerStatsHistoryTable);
             System.out.println("PlayerStatsHistory table initialized successfully.");
+
+            String createClanTable = "CREATE TABLE IF NOT EXISTS Clans (" +
+                    "id SERIAL PRIMARY KEY, " +
+                    "name VARCHAR(64) NOT NULL, " +
+                    "honor INT, " +
+                    "numberPlayers SMALLINT, " +
+                    "maxPlayers SMALLINT, " +
+                    "leader VARCHAR(10), " +
+                    "deputy VARCHAR(10), " +
+                    "lvl SMALLINT, " +
+                    "territory VARCHAR(30), " +
+                    "honorTer INT, " +
+                    "items VARCHAR(30), " +
+                    "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                    ");";
+
+            statement.executeUpdate(createClanTable);
+            System.out.println("Clan table successfully initialized");
+
+            String createClanHistoryTable = "CREATE TABLE IF NOT EXISTS ClanHistory (" +
+                    "id SERIAL PRIMARY KEY, " +
+                    "clan_id INT NOT NULL REFERENCES clans(id) ON DELETE CASCADE, " +
+                    "type SMALLINT, " +
+                    "val VARCHAR(64), " +
+                    "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                    ");";
+            statement.executeUpdate(createClanHistoryTable);
+            System.out.println("ClanHistory table initialized successfully.");
 
         } catch (SQLException e) {
             e.printStackTrace();

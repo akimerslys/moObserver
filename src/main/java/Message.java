@@ -22,7 +22,7 @@ public class Message {
     public int getCountWin() { return countWin; }
     public int getCountLoose() { return countLoose; }
     public int getWin() { return countWin; }
-    public int getLoose() { return countLoose; }
+    public int getLose() { return countLoose; }
     public String getMessage() { return message; }
     public String getClan() { return clan; }
     public String getColorNick() { return colorNick; }

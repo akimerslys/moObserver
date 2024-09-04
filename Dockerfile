@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Copy the .jar file to the working directory in the container
 
-COPY ./target/moObserver-1-all.jar /app/moObserver.jar
+COPY ./target/moObserver-2-all.jar /app/moObserver.jar
 COPY ./.env .
 # Expose port 8080 if your application listens on it (optional)
 # EXPOSE 8080

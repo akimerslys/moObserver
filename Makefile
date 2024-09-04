@@ -39,5 +39,5 @@ update:
 	docker compose up -d  moclient
 
 send:
-	echo scp target/moObserver-1-all.jar $(DB_USER)@$(DB_HOST):~/work/moObs/target/
+	echo scp target/moObserver-2-all.jar $(DB_USER)@$(DB_HOST):~/work/moObs/target/
 
