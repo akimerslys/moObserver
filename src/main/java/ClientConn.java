@@ -33,7 +33,7 @@ public class ClientConn {
         this.login = login;
         this.pass = pass;
         this.conn = conn;
-        opensocket();
+        opensocket(false);
         messageProcessing();
         connectAndLogin();
     }
@@ -55,7 +55,7 @@ public class ClientConn {
                 });
     }
 
-    public void opensocket() {
+    public void opensocket(boolean rcon) {
         try {
             IO.Options options = new IO.Options();
             //options.proxy = proxy;
@@ -63,12 +63,38 @@ public class ClientConn {
             options.timeout = 30000L;
             options.reconnectionAttempts = 100;
             options.reconnectionDelay = 10000;
+            if (rcon) {
+                try {
+                    Thread.sleep(10000);
+                } catch (InterruptedException e) {
+                    logger.severe(e.toString());
+                }
+            }
             this.a = new hj(IO.socket(URI.create("http://mafiaonline.jcloud.kz"), options));
             setupListeners();
         } catch (Exception e) {
             handleError(e);
             System.out.println("Failed to create socket: " + e.getMessage());
         }
+    }
+
+    private void closesocket() {
+        this.reconntask.cancel(true);
+        this.a.closeSocket();
+        this.a = null;
+    }
+
+    private void connError(Object err) {
+
+        this.logged = false;
+        this.reconTimes++;
+        if (err.toString().contains("transport") || err.toString().contains("xhr") || this.reconTimes == 15) {
+            closesocket();
+            opensocket(true);
+            connectAndLogin();
+            return;
+        }
+        scheduleReconnect();
     }
 
     public CompletableFuture<Void> connect() {
@@ -82,30 +108,19 @@ public class ClientConn {
                     login_user();
                     future.complete(null);
                 } else {
-                    scheduleReconnect();
+                    connError(args[0]);
                 }
             }).on(Socket.EVENT_CONNECT_ERROR, args -> {
                 System.out.println("Connection error: " + args[0]);
-                if (Objects.equals(args[0].toString(), "transport error")) {
-                    this.a.closeSocket();
-                    opensocket();
-                    connectAndLogin();
-                    return;
-                }
-                scheduleReconnect();
+                connError(args[0]);
+
             }).on(Socket.EVENT_CONNECT_TIMEOUT, args -> {
                 System.out.println("Connection timeout: " + args[0]);
-                scheduleReconnect();
+                connError(args[0]);
+
             }).on(Socket.EVENT_DISCONNECT, args -> {
                 System.out.println("Disconnected from server: " + args[0]);
-                if (Objects.equals(args[0].toString(), "transport error")) {
-                    this.a.closeSocket();
-                    opensocket();
-                    connectAndLogin();
-                    return;
-                }
-                stopScheduling();
-                scheduleReconnect();
+                connError(args[0]);
             });
 
             this.a.socket.connect();
@@ -478,6 +493,7 @@ public class ClientConn {
         Player p = getPlayer(user_login);
         if (p != null) {
             if (full) {
+                toUpdate |= checkPlayerChange(p.getId(), "mmr", mmr, p.getMmr());
                 toUpdate |= checkPlayerChange(p.getId(), "win", win, p.getWin());
                 toUpdate |= checkPlayerChange(p.getId(), "lose", lose, p.getLose());
                 toUpdate |= checkPlayerChange(p.getId(), "clan", clan, p.getClan());
@@ -547,6 +563,15 @@ public class ClientConn {
     }
 
     private boolean checkPlayerChange(int playerId, String changeType, Object newValue, Object currentValue) {
+
+        if (Objects.equals(changeType, "win") || Objects.equals(changeType, "lose")) {
+            if (newValue instanceof Integer && currentValue instanceof Integer) {
+                if ((int) newValue <= (int) currentValue) {
+                    return false;
+                }
+            }
+        }
+
         if (!Objects.equals(currentValue, newValue)) {
             commitChange(playerId, changeType, String.valueOf(newValue));
             return true;
