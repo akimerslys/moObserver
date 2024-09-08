@@ -164,20 +164,9 @@ public class ClientConn {
 
     private void startScheduling() {
         scheduler.scheduleAtFixedRate(this::requestTop, 0, 1, TimeUnit.HOURS);
-        scheduler.scheduleAtFixedRate(this::requestTopClan, 120, 1, TimeUnit.DAYS);
+        scheduler.scheduleAtFixedRate(this::requestTopClan, 120, 86400, TimeUnit.SECONDS);
     }
 
-    private void stopScheduling() {
-        scheduler.shutdown();
-        try {
-            if (!scheduler.awaitTermination(10, TimeUnit.SECONDS)) {
-                scheduler.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            scheduler.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
-    }
 
     private void messageProcessing() {
         logger.info("started message processing");
@@ -266,7 +255,11 @@ public class ClientConn {
         String logmsg = "%s [%d|%d:%d] : %s";
         logger.info(String.format(logmsg, m.getAuthor(), m.getMmr(), m.getCountWin(), m.getCountLoose(), m.getMessage()));
 
-        queue.offer(m);
+        boolean r = queue.offer(m);
+
+        if (!r) {
+            logger.severe("Message didnt got to the queue");
+        }
     }
 
     private void handleResultTop(Object... args) {
@@ -315,6 +308,10 @@ public class ClientConn {
 
     private void processRankUpdates(JSONArray playerUpdates) {
 
+        long startTime = System.nanoTime();
+        int l = playerUpdates.length();
+        logger.info("Total Players to update: " + l);
+
         List<JSONArray> chunks = chunkArray(playerUpdates, 50);
 
         System.out.println(playerUpdates.length());
@@ -327,12 +324,22 @@ public class ClientConn {
                 int newMmr = playerUpdate.getInt("mmr");
                 updateOrInsertPlayer(user_login, newMmr, 0, 0, "?", "?", false);
             }
-            logger.info("Updated ~" + j * 50 + " players");
+            logger.info("Updated players ~" + j * 50 + "/" + l);
         }
+
+        logger.info(String.format(
+                "%d PLAYERS updated in %.6f s",
+                l,
+                (System.nanoTime() - startTime) / 1_000_000_000.0));
+
     }
 
     private void processClanUpdates(JSONArray clanUpdates) {
-        logger.info("Total clans to update: " + clanUpdates.length());
+
+        long startTime = System.nanoTime();
+
+        int l = clanUpdates.length();
+        logger.info("Total clans to update: " + l);
 
         int CHUNK_SIZE = 100;
 
@@ -358,9 +365,13 @@ public class ClientConn {
                     updateOrInsertClan(clan);
                 }
             }
-            logger.info("Updated ~" + j * CHUNK_SIZE + " clans");
+            logger.info("Updated clans ~" + j * CHUNK_SIZE + "/" + l);
             j++;
         }
+        logger.info(String.format(
+                "%d CLANS updated in %.6f s",
+                l,
+                (System.nanoTime() - startTime) / 1_000_000_000.0));
     }
 
     private List<JSONArray> chunkArray(JSONArray array, int chunkSize) {
@@ -450,15 +461,15 @@ public class ClientConn {
         Clan c = getClan(clan.getName());
         if (c != null) {
             int id = c.getId();
-            toUpdate |= checkClanChange(id, 0, clan.getHonor(), c.getHonor());
-            toUpdate |= checkClanChange(id, 1, clan.getNumPlayers(), c.getNumPlayers());
-            toUpdate |= checkClanChange(id, 2, clan.getMaxPlayers(), c.getMaxPlayers());
-            toUpdate |= checkClanChange(id, 3, clan.getLeader(), c.getLeader());
-            toUpdate |= checkClanChange(id, 4, clan.getDeputy(), c.getDeputy());
-            toUpdate |= checkClanChange(id, 5, clan.getLvl(), c.getLvl());
-            toUpdate |= checkClanChange(id, 6, clan.getTerritory(), c.getTerritory());
-            toUpdate |= checkClanChange(id, 7, clan.getHonorTer(), c.getHonorTer());
-            toUpdate |= checkClanChange(id, 8, clan.getItems(), c.getItems());
+            toUpdate |= checkChange(id, 0, clan.getHonor(), c.getHonor(), true);
+            toUpdate |= checkChange(id, 1, clan.getNumPlayers(), c.getNumPlayers(), true);
+            toUpdate |= checkChange(id, 2, clan.getMaxPlayers(), c.getMaxPlayers(), true);
+            toUpdate |= checkChange(id, 3, clan.getLeader(), c.getLeader(), true);
+            toUpdate |= checkChange(id, 4, clan.getDeputy(), c.getDeputy(), true);
+            toUpdate |= checkChange(id, 5, clan.getLvl(), c.getLvl(), true);
+            toUpdate |= checkChange(id, 6, clan.getTerritory(), c.getTerritory(), true);
+            toUpdate |= checkChange(id, 7, clan.getHonorTer(), c.getHonorTer(), true);
+            toUpdate |= checkChange(id, 8, clan.getItems(), c.getItems(), true);
 
         } else {
             sql = "INSERT INTO Clans (name, honor, numberPlayers, maxPlayers, leader, deputy, lvl, territory, honorTer, items) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -493,13 +504,13 @@ public class ClientConn {
         Player p = getPlayer(user_login);
         if (p != null) {
             if (full) {
-                toUpdate |= checkPlayerChange(p.getId(), "mmr", mmr, p.getMmr());
-                toUpdate |= checkPlayerChange(p.getId(), "win", win, p.getWin());
-                toUpdate |= checkPlayerChange(p.getId(), "lose", lose, p.getLose());
-                toUpdate |= checkPlayerChange(p.getId(), "clan", clan, p.getClan());
-                toUpdate |= checkPlayerChange(p.getId(), "color", color, p.getColor());
+                toUpdate |= checkChange(p.getId(), 0, mmr, p.getMmr(), false);
+                toUpdate |= checkChange(p.getId(), 1, win, p.getWin(), false);
+                toUpdate |= checkChange(p.getId(), 2, lose, p.getLose(), false);
+                toUpdate |= checkChange(p.getId(), 3, clan, p.getClan(), false);
+                toUpdate |= checkChange(p.getId(), 4, color, p.getColor(), false);
             } else {
-                toUpdate |= checkPlayerChange(p.getId(), "mmr", mmr, p.getMmr());
+                toUpdate |= checkChange(p.getId(), 0, mmr, p.getMmr(), false);
                 win = p.getWin();
                 lose = p.getLose();
                 clan = p.getClan();
@@ -530,41 +541,29 @@ public class ClientConn {
     }
 
 
-    private void commitChange(int playerId, String changeType, String newValue) {
-        String insertHistorySql = "INSERT INTO PlayerStatsHistory (player_id, changetype, changeval, updated_at) " +
-                "VALUES (?, ?, ?, ?)";
+    private void commitChange(int id, int changeType, String newValue, boolean clan) {
+        String sql = "INSERT INTO PlayerStatsHistory (player_id, type, val) " +
+                "VALUES (?, ?, ?)";
 
-        try (PreparedStatement stmt = conn.prepareStatement(insertHistorySql)) {
-            stmt.setInt(1, playerId);
-            stmt.setString(2, changeType);
+        if (clan) {
+            sql = "INSERT INTO ClanHistory (clan_id, type, val) " +
+                "VALUES (?, ?, ?)";
+        }
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, id);
+            stmt.setInt(2, changeType);
             stmt.setString(3, newValue);
-            stmt.setTimestamp(4, new Timestamp(System.currentTimeMillis()));
             stmt.executeUpdate();
-            logger.info("Changed for #" + playerId + " [" + changeType + " : " + newValue + "]");
+            logger.info("Changed " + (clan ? "CLAN" : "PLAYER") + " : #" + id + "  [" + changeType + " : " + newValue + "]");
         } catch (SQLException e) {
             handleError(e);
         }
     }
 
-    private void commitClanChange(int clanId, int type, String value) {
-        String insertClanHistorySql = "INSERT INTO ClanHistory (clan_id, type, val, updated_at) " +
-                "VALUES (?, ?, ?, ?)";
+    private boolean checkChange(int playerId, int changeType, Object newValue, Object currentValue, boolean clan) {
 
-         try (PreparedStatement stmt = conn.prepareStatement(insertClanHistorySql)) {
-            stmt.setInt(1, clanId);
-            stmt.setInt(2, type);
-            stmt.setString(3, value);
-            stmt.setTimestamp(4, new Timestamp(System.currentTimeMillis()));
-            stmt.executeUpdate();
-            logger.info("Changed for #" + clanId + " [" + type + " : " + value + "]");
-        } catch (SQLException e) {
-            handleError(e);
-        }
-    }
-
-    private boolean checkPlayerChange(int playerId, String changeType, Object newValue, Object currentValue) {
-
-        if (Objects.equals(changeType, "win") || Objects.equals(changeType, "lose")) {
+        if (!clan && (changeType == 1 || changeType == 2)) {
             if (newValue instanceof Integer && currentValue instanceof Integer) {
                 if ((int) newValue <= (int) currentValue) {
                     return false;
@@ -573,15 +572,7 @@ public class ClientConn {
         }
 
         if (!Objects.equals(currentValue, newValue)) {
-            commitChange(playerId, changeType, String.valueOf(newValue));
-            return true;
-        }
-        return false;
-    }
-
-    private boolean checkClanChange(int clanId, int type, Object newValue, Object curValue) {
-        if (!Objects.equals(curValue, newValue)) {
-            commitClanChange(clanId, type, String.valueOf(newValue));
+            commitChange(playerId, changeType, String.valueOf(newValue), clan);
             return true;
         }
         return false;

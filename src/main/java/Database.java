@@ -48,8 +48,8 @@ public class Database {
             String createPlayerStatsHistoryTable = "CREATE TABLE IF NOT EXISTS PlayerStatsHistory (" +
                     "id SERIAL PRIMARY KEY, " +
                     "player_id INT NOT NULL REFERENCES PlayerStats(id) ON DELETE CASCADE, " +
-                    "changetype VARCHAR(12), " +
-                    "changeval VARCHAR(64), " +
+                    "type SMALLINT NOT NULL , " +
+                    "val VARCHAR(64) NOT NULL, " +
                     "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
                     ");";
             statement.executeUpdate(createPlayerStatsHistoryTable);
