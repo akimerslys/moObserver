@@ -1,4 +1,4 @@
-Chat & Leaderboard grabber of Mafia Online Game in Apple Store/Google Play/Steam for making the Dataset of every user behavior.
+Chat & Leaderboard grabber that bypass protection and directly connectiong to the Mafia Online Game Server in Apple for making the Dataset of users behavior.
 
 Written in pure Java for studies and working purposes.
 
