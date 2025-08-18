@@ -1,4 +1,4 @@
-Chat & Leaderboard grabber that bypass protection and directly connectiong to the Mafia Online Game Server in Apple for making the Dataset of users behavior.
+Chat & Leaderboard grabber that bypass protection and directly connectiong to the Mafia Online Game Server. Used for making the Dataset of users behavior.
 
 Written in pure Java for studies and working purposes.
 
